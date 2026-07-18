@@ -7,7 +7,7 @@
     --accent: #7b68ee; --warn: #f0a060; --danger: #e05570; --safe: #60b0a0;
     --bar-bg: #2a2a3e; --border: #2e3a50; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--txt); font:13px/1.5 "Microsoft YaHei","PingFang SC",sans-serif; padding:10px; width:100%; }
+  body { background:var(--bg); color:var(--txt); font:13px/1.5 "Microsoft YaHei","PingFang SC",sans-serif; padding:10px; width:100%; min-height:200px; }
   .panel { width:100%; max-width:420px; margin:0 auto; }
   /* 顶栏 */
   .weather-bar { background:var(--card-bg); border-radius:6px; padding:8px 12px; margin-bottom:8px;
@@ -151,41 +151,55 @@ function render(sd) {
   document.getElementById('panel').innerHTML = html;
 }
 
-async function init() {
-  var sd = await readData();
-  if (sd && Object.keys(sd).length > 0) {
-    render(sd);
-  }
+var isLoading = true;
 
-  // 事件监听刷新
+async function init() {
+  document.getElementById('panel').innerHTML = '<div class="empty">加载中...</div>';
+
+  // 注册事件监听（先注册再读数据，避免漏掉初始更新）
   try {
-    var tavernEvents = (window.tavern_events ||
-      ((typeof eventOn === 'function') ? { MESSAGE_RECEIVED:'MESSAGE_RECEIVED', MESSAGE_UPDATED:'MESSAGE_UPDATED' } : null));
-    if (tavernEvents && typeof eventOn === 'function') {
-      var timer = null;
-      eventOn(tavernEvents.MESSAGE_UPDATED, function() {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(refresh, 500);
+    if (typeof eventOn === 'function') {
+      var evtTimer = null;
+      eventOn('MESSAGE_UPDATED', function() {
+        if (evtTimer) clearTimeout(evtTimer);
+        evtTimer = setTimeout(refresh, 300);
       });
-      eventOn(tavernEvents.MESSAGE_RECEIVED, function() {
-        setTimeout(refresh, 1500);
+      eventOn('MESSAGE_RECEIVED', function() {
+        setTimeout(refresh, 1000);
+      });
+      eventOn('VARIABLE_UPDATE_ENDED', function() {
+        setTimeout(refresh, 200);
       });
     }
-  } catch(e) { /* ignore */ }
+  } catch(e) {}
+
+  // 首次读取，最多重试10次
+  for (var retry = 0; retry < 10; retry++) {
+    var sd = await readData();
+    if (sd && sd.npc) {
+      render(sd);
+      isLoading = false;
+      return;
+    }
+    await new Promise(function(r) { setTimeout(r, 500); });
+  }
+
+  document.getElementById('panel').innerHTML = '<div class="empty">等待数据中...请继续对话</div>';
 }
 
 async function refresh() {
   var sd = await readData();
-  if (sd && Object.keys(sd).length > 0) render(sd);
+  if (sd && sd.npc) {
+    render(sd);
+    isLoading = false;
+  }
 }
 
 // boot
 if (typeof $ === 'function') {
   $(function() { init(); });
-} else if (document.readyState === 'complete') {
-  init();
 } else {
-  window.addEventListener('load', init);
+  init();
 }
 </script>
 </body>
