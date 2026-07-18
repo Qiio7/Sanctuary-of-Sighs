@@ -46,11 +46,10 @@ var STAGE_NAMES = {
   vespera: ['蛛矛轻触·管家教程第一课','蜂蜜蛋糕与手把手的温柔陷阱','灶台边失控的心跳','蜘蛛小姐的防线崩塌','分羹者的告白'],
   valentina: ['满身尖刺的笨拙女仆','摔碎茶杯的别扭关心','醋海翻波的傲娇大小姐','虎牙轻咬的投降','乖女儿的日常撒娇']
 };
-function affStage(key, v) { if(v<=0)return'陌生';var i=v<50?0:v<100?1:v<150?2:v<200?3:4;return STAGE_NAMES[key]?STAGE_NAMES[key][i]:'未知'; }
+function affStage(key, v) { v=Number(v)||0;var i=v<50?0:v<100?1:v<150?2:v<200?3:4;return STAGE_NAMES[key]?STAGE_NAMES[key][i]:'—'; }
 function affCls(v) { if(v<50)return'low';if(v<100)return'mid';if(v<175)return'high';return'max'; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function pct(v) { return Math.min(250,Math.max(0,Number(v)||0)); }
-function hasVal(s) { var x=String(s||'').trim(); return x.length>0; }
 
 function render(sd) {
   var present = (sd.world && Array.isArray(sd.world.present_npc)) ? sd.world.present_npc : [];
@@ -67,14 +66,12 @@ function render(sd) {
     h += '<span class="npc-name">'+(isPres?'<span class="status-dot on"></span>':'<span class="status-dot off"></span>')+esc(NPC_LABELS[key])+'</span>';
     h += '<span class="npc-stage">'+affStage(key,af)+'</span></div>';
     h += '<div class="aff-bar-row"><div class="aff-bar"><div class="aff-fill '+affCls(af)+'" style="width:'+(af/250*100)+'%"></div></div><span class="aff-num">'+af+'</span></div>';
-    if (isPres) {
-      h += '<div class="detail-row">';
-      if (hasVal(npc.clothing)) h += '<span class="detail-item">衣着 <strong>'+esc(npc.clothing)+'</strong></span>';
-      if (hasVal(npc.emotion)) h += '<span class="detail-item">心情 <strong>'+esc(npc.emotion)+'</strong></span>';
-      if (hasVal(npc.breast_state)) h += '<span class="detail-item nsfw">胸部 <strong>'+esc(npc.breast_state)+'</strong></span>';
-      if (hasVal(npc.vagina_state)) h += '<span class="detail-item nsfw">私处 <strong>'+esc(npc.vagina_state)+'</strong></span>';
-      h += '</div>';
-    }
+    h += '<div class="detail-row">';
+    h += '<span class="detail-item">衣着 <strong>'+esc(npc.clothing||'—')+'</strong></span>';
+    h += '<span class="detail-item">心情 <strong>'+esc(npc.emotion||'—')+'</strong></span>';
+    h += '<span class="detail-item nsfw">胸部 <strong>'+esc(npc.breast_state||'—')+'</strong></span>';
+    h += '<span class="detail-item nsfw">私处 <strong>'+esc(npc.vagina_state||'—')+'</strong></span>';
+    h += '</div>';
     h += '</div>';
   }
   var qe = quest.entries||{}, qk = Object.keys(qe), aq = [];
