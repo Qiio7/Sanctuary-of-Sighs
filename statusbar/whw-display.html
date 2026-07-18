@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { --bg: #1a1a2e; --card-bg: #16213e; --txt: #e0e0e0; --sub: #8899aa;
+    --accent: #7b68ee; --warn: #f0a060; --danger: #e05570; --safe: #60b0a0;
+    --bar-bg: #2a2a3e; --border: #2e3a50; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font:13px/1.5 "Microsoft YaHei","PingFang SC",sans-serif; padding:10px; width:100%; min-height:200px; }
+  .panel { width:100%; max-width:420px; margin:0 auto; }
+  .weather-bar { background:var(--card-bg); border-radius:6px; padding:8px 12px; margin-bottom:8px; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--sub); }
+  .npc-card { background:var(--card-bg); border-radius:8px; padding:10px 12px; margin-bottom:6px; border-left:3px solid transparent; }
+  .npc-card.present { border-left-color:var(--accent); }
+  .npc-card.absent { opacity:.6; border-left-color:var(--border); }
+  .npc-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .npc-name { font-size:15px; font-weight:700; }
+  .npc-stage { font-size:11px; color:var(--sub); background:var(--bar-bg); padding:2px 8px; border-radius:10px; }
+  .aff-bar-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .aff-bar { flex:1; height:6px; background:var(--bar-bg); border-radius:3px; overflow:hidden; }
+  .aff-fill { height:100%; border-radius:3px; transition:width .5s; }
+  .aff-fill.low { background:var(--danger); } .aff-fill.mid { background:var(--warn); }
+  .aff-fill.high { background:var(--safe); } .aff-fill.max { background:var(--accent); }
+  .aff-num { font-size:11px; color:var(--sub); min-width:36px; text-align:right; }
+  .detail-row { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:4px; }
+  .detail-item { font-size:11px; color:var(--sub); } .detail-item strong { color:var(--txt); font-weight:400; }
+  .detail-item.nsfw strong { color:var(--warn); }
+  .section-label { font-size:11px; color:var(--sub); margin:10px 0 4px; }
+  .quest-card { background:var(--card-bg); border-radius:6px; padding:8px 10px; margin-bottom:4px; display:flex; justify-content:space-between; gap:8px; }
+  .quest-info { flex:1; min-width:0; } .quest-name { font-size:13px; font-weight:600; }
+  .quest-desc { font-size:11px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .quest-expiry { font-size:10px; color:var(--warn); white-space:nowrap; }
+  .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+  .status-dot.on { background:var(--safe); } .status-dot.off { background:var(--border); }
+</style>
+</head>
+<body>
+<div class="panel" id="panel">加载中...</div>
+<script>
+var NPC_LABELS = { eclipsa:'伊克利普斯', vespera:'维斯佩拉', valentina:'瓦伦蒂娜' };
+var SEASON_LABELS = { spring:'春·透明之季', summer:'夏·灰色之季', autumn:'秋·金光之季', winter:'冬·雪狱之季' };
+var NPC_ORDER = ['eclipsa','vespera','valentina'];
+
+var STAGE_NAMES = {
+  eclipsa: ['寒霜触手的疏离主人','紫色眼眸的偷看与借口','塔楼月下的失速心跳','失控的触手与母性泛滥','触手妈妈的温柔侍奉'],
+  vespera: ['蛛矛轻触·管家教程第一课','蜂蜜蛋糕与手把手的温柔陷阱','灶台边失控的心跳','蜘蛛小姐的防线崩塌','分羹者的告白'],
+  valentina: ['满身尖刺的笨拙女仆','摔碎茶杯的别扭关心','醋海翻波的傲娇大小姐','虎牙轻咬的投降','乖女儿的日常撒娇']
+};
+function affStage(key, v) { v=Number(v)||0;var i=v<50?0:v<100?1:v<150?2:v<200?3:4;return STAGE_NAMES[key]?STAGE_NAMES[key][i]:'—'; }
+function affCls(v) { if(v<50)return'low';if(v<100)return'mid';if(v<175)return'high';return'max'; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function pct(v) { return Math.min(250,Math.max(0,Number(v)||0)); }
+
+function render(sd) {
+  var present = (sd.world && Array.isArray(sd.world.present_npc)) ? sd.world.present_npc : [];
+  var world = sd.world || { season:'winter', weather:'阴' };
+  var quest = sd.quest || { entries:{} };
+  var npcs = sd.npc || {};
+  var h = '';
+  h += '<div class="weather-bar">❄ '+esc(SEASON_LABELS[world.season]||world.season)+' · '+esc(world.weather||'—')+'</div>';
+  h += '<div class="section-label">角色亲密度</div>';
+  for (var i=0;i<NPC_ORDER.length;i++) {
+    var key = NPC_ORDER[i], npc = npcs[key]||{affection:0}, af = pct(npc.affection), isPres = present.indexOf(key)!==-1;
+    h += '<div class="npc-card '+(isPres?'present':'absent')+'">';
+    h += '<div class="npc-head">';
+    h += '<span class="npc-name">'+(isPres?'<span class="status-dot on"></span>':'<span class="status-dot off"></span>')+esc(NPC_LABELS[key])+'</span>';
+    h += '<span class="npc-stage">'+affStage(key,af)+'</span></div>';
+    h += '<div class="aff-bar-row"><div class="aff-bar"><div class="aff-fill '+affCls(af)+'" style="width:'+(af/250*100)+'%"></div></div><span class="aff-num">'+af+'</span></div>';
+    h += '<div class="detail-row">';
+    h += '<span class="detail-item">衣着 <strong>'+esc(npc.clothing||'—')+'</strong></span>';
+    h += '<span class="detail-item">心情 <strong>'+esc(npc.emotion||'—')+'</strong></span>';
+    h += '<span class="detail-item nsfw">胸部 <strong>'+esc(npc.breast_state||'—')+'</strong></span>';
+    h += '<span class="detail-item nsfw">私处 <strong>'+esc(npc.vagina_state||'—')+'</strong></span>';
+    h += '</div>';
+    h += '</div>';
+  }
+  var qe = quest.entries||{}, qk = Object.keys(qe), aq = [];
+  for (var j=0;j<qk.length;j++) { var q=qe[qk[j]]||{}; if (q.status==='进行中'||!q.status) aq.push({id:qk[j],data:q}); }
+  h += '<div class="section-label">进行中的任务</div>';
+  if (aq.length===0) { h += '<div style="color:var(--sub);padding:8px;font-size:12px;text-align:center;">暂无任务</div>'; }
+  else for (var k=0;k<aq.length;k++) {
+    var a=aq[k]; h += '<div class="quest-card"><div class="quest-info"><div class="quest-name">'+esc(a.data.name||a.id)+'</div><div class="quest-desc">'+esc(a.data.description||'')+'</div></div><div class="quest-expiry">'+esc(a.data.expiry||'')+'</div></div>';
+  }
+  document.getElementById('panel').innerHTML = h;
+}
+
+async function tryRead() {
+  if (typeof getVariables === 'function') {
+    try {
+      var v = getVariables({type:'message', message_id:'latest'});
+      if (v && v.stat_data) { render(v.stat_data); return true; }
+    } catch(e) {}
+  }
+  try {
+    if (typeof Mvu !== 'undefined' && Mvu.getMvuData) {
+      var md = Mvu.getMvuData({type:'message', message_id:'latest'});
+      if (md && md.stat_data) { render(md.stat_data); return true; }
+    }
+  } catch(e) {}
+}
+
+async function boot() {
+  for (var i=0;i<20;i++) {
+    var ok = await tryRead();
+    if (ok) return;
+    await new Promise(function(r){setTimeout(r,800);});
+  }
+  document.getElementById('panel').innerHTML = '<div style="color:var(--sub);text-align:center;padding:20px;">无数据 — 请继续对话</div>';
+}
+boot();
+</script>
+</body>
+</html>
