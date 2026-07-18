@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  :root { --bg: #1a1a2e; --card-bg: #16213e; --txt: #e0e0e0; --sub: #8899aa;
+    --accent: #7b68ee; --warn: #f0a060; --danger: #e05570; --safe: #60b0a0;
+    --bar-bg: #2a2a3e; --border: #2e3a50; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font:13px/1.5 "Microsoft YaHei","PingFang SC",sans-serif; padding:10px; width:100%; }
+  .panel { width:100%; max-width:420px; margin:0 auto; }
+  /* 顶栏 */
+  .weather-bar { background:var(--card-bg); border-radius:6px; padding:8px 12px; margin-bottom:8px;
+    display:flex; align-items:center; gap:8px; font-size:13px; color:var(--sub); }
+  .weather-bar .icon { font-size:18px; }
+  .weather-bar .txt { flex:1; }
+  /* NPC卡片 */
+  .npc-card { background:var(--card-bg); border-radius:8px; padding:10px 12px; margin-bottom:6px;
+    border-left:3px solid transparent; transition:border-color .3s; }
+  .npc-card.present { border-left-color:var(--accent); }
+  .npc-card.absent { opacity:.6; border-left-color:var(--border); }
+  .npc-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .npc-name { font-size:15px; font-weight:700; }
+  .npc-stage { font-size:11px; color:var(--sub); background:var(--bar-bg); padding:2px 8px; border-radius:10px; }
+  /* 好感条 */
+  .aff-bar-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+  .aff-bar { flex:1; height:6px; background:var(--bar-bg); border-radius:3px; overflow:hidden; }
+  .aff-fill { height:100%; border-radius:3px; transition:width .5s; }
+  .aff-fill.low { background:var(--danger); }
+  .aff-fill.mid { background:var(--warn); }
+  .aff-fill.high { background:var(--safe); }
+  .aff-fill.max { background:var(--accent); }
+  .aff-num { font-size:11px; color:var(--sub); min-width:36px; text-align:right; }
+  /* 详情行 */
+  .detail-row { display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:4px; }
+  .detail-item { font-size:11px; color:var(--sub); }
+  .detail-item strong { color:var(--txt); font-weight:400; }
+  .detail-item.nsfw strong { color:var(--warn); }
+  /* 章节标签 */
+  .section-label { font-size:11px; color:var(--sub); text-transform:uppercase;
+    letter-spacing:1px; margin:10px 0 4px; padding-left:4px; }
+  /* 任务卡片 */
+  .quest-card { background:var(--card-bg); border-radius:6px; padding:8px 10px; margin-bottom:4px;
+    display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .quest-info { flex:1; min-width:0; }
+  .quest-name { font-size:13px; font-weight:600; }
+  .quest-desc { font-size:11px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .quest-expiry { font-size:10px; color:var(--warn); white-space:nowrap; }
+  /* 空态 */
+  .empty { text-align:center; color:var(--sub); padding:16px; font-size:12px; }
+  /* 状态栏 */
+  .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+  .status-dot.on { background:var(--safe); }
+  .status-dot.off { background:var(--border); }
+</style>
+</head>
+<body>
+<div class="panel" id="panel"></div>
+<script>
+const NPC_LABELS = { eclipsa:'伊克利普斯', vespera:'维斯佩拉', valentina:'瓦伦蒂娜' };
+const SEASON_LABELS = { spring:'春·透明之季', summer:'夏·灰色之季', autumn:'秋·金光之季', winter:'冬·雪狱之季' };
+const NPC_ORDER = ['eclipsa','vespera','valentina'];
+
+function affStage(v) {
+  if (v<=0) return '陌生'; if (v<=20) return '初识'; if (v<=40) return '好感';
+  if (v<=60) return '亲密'; if (v<=80) return '爱恋'; return '沉沦';
+}
+function affCls(v) {
+  if (v<=20) return 'low'; if (v<=40) return 'mid'; if (v<=70) return 'high'; return 'max';
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function pct(v) { return Math.min(100,Math.max(0,Number(v)||0)); }
+function hasVal(s) { var x=String(s||'').trim(); return x.length>0; }
+
+async function readData() {
+  try { await waitGlobalInitialized('Mvu'); } catch(e) { /* ignore */ }
+  try {
+    var v = getVariables({type:'message', message_id:'latest'});
+    return (v && v.stat_data) ? v.stat_data : {};
+  } catch(e) { return {}; }
+}
+
+function render(sd) {
+  var present = (sd.world && sd.world.present_npc) ? sd.world.present_npc : [];
+  var world = sd.world || { season:'winter', weather:'阴' };
+  var quest = sd.quest || { entries:{} };
+  var npcs = sd.npc || {};
+
+  var html = '';
+
+  // === 天气栏 ===
+  html += '<div class="weather-bar">';
+  html += '<span class="icon">❄</span>';
+  html += '<span class="txt">' + esc(SEASON_LABELS[world.season] || world.season) + ' · ' + esc(world.weather || '—') + '</span>';
+  html += '</div>';
+
+  // === NPC卡片 ===
+  html += '<div class="section-label">▸ 角色亲密度</div>';
+  for (var i=0; i<NPC_ORDER.length; i++) {
+    var key = NPC_ORDER[i];
+    var npc = npcs[key] || { affection:0, clothing:'', emotion:'', breast_state:'', vagina_state:'' };
+    var af = pct(npc.affection);
+    var isPres = present.indexOf(key) !== -1;
+    html += '<div class="npc-card ' + (isPres ? 'present' : 'absent') + '">';
+    // head
+    html += '<div class="npc-head">';
+    html += '<span class="npc-name">' + (isPres ? '<span class="status-dot on"></span>' : '<span class="status-dot off"></span>') + esc(NPC_LABELS[key]) + '</span>';
+    html += '<span class="npc-stage">' + affStage(af) + '</span>';
+    html += '</div>';
+    // bar
+    html += '<div class="aff-bar-row">';
+    html += '<div class="aff-bar"><div class="aff-fill ' + affCls(af) + '" style="width:' + af + '%"></div></div>';
+    html += '<span class="aff-num">' + af + '</span>';
+    html += '</div>';
+    // details (only for present NPCs, show all including NSFW)
+    if (isPres) {
+      html += '<div class="detail-row">';
+      if (hasVal(npc.clothing)) html += '<span class="detail-item">衣着 <strong>' + esc(npc.clothing) + '</strong></span>';
+      if (hasVal(npc.emotion)) html += '<span class="detail-item">心情 <strong>' + esc(npc.emotion) + '</strong></span>';
+      if (hasVal(npc.breast_state)) html += '<span class="detail-item nsfw">胸部 <strong>' + esc(npc.breast_state) + '</strong></span>';
+      if (hasVal(npc.vagina_state)) html += '<span class="detail-item nsfw">私处 <strong>' + esc(npc.vagina_state) + '</strong></span>';
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // === 任务 ===
+  var qEntries = quest.entries || {};
+  var qKeys = Object.keys(qEntries);
+  var activeQ = [];
+  for (var j=0; j<qKeys.length; j++) {
+    var q = qEntries[qKeys[j]] || {};
+    if (q.status === '进行中' || !q.status) activeQ.push({ id:qKeys[j], data:q });
+  }
+  html += '<div class="section-label">▸ 进行中的任务</div>';
+  if (activeQ.length === 0) {
+    html += '<div class="empty">暂无进行中的任务</div>';
+  } else {
+    for (var k=0; k<activeQ.length; k++) {
+      var aq = activeQ[k];
+      html += '<div class="quest-card">';
+      html += '<div class="quest-info">';
+      html += '<div class="quest-name">' + esc(aq.data.name || aq.id) + '</div>';
+      html += '<div class="quest-desc">' + esc(aq.data.description || '') + '</div>';
+      html += '</div>';
+      html += '<div class="quest-expiry">' + esc(aq.data.expiry || '') + '</div>';
+      html += '</div>';
+    }
+  }
+
+  document.getElementById('panel').innerHTML = html;
+}
+
+async function init() {
+  var sd = await readData();
+  if (sd && Object.keys(sd).length > 0) {
+    render(sd);
+  }
+
+  // 事件监听刷新
+  try {
+    var tavernEvents = (window.tavern_events ||
+      ((typeof eventOn === 'function') ? { MESSAGE_RECEIVED:'MESSAGE_RECEIVED', MESSAGE_UPDATED:'MESSAGE_UPDATED' } : null));
+    if (tavernEvents && typeof eventOn === 'function') {
+      var timer = null;
+      eventOn(tavernEvents.MESSAGE_UPDATED, function() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(refresh, 500);
+      });
+      eventOn(tavernEvents.MESSAGE_RECEIVED, function() {
+        setTimeout(refresh, 1500);
+      });
+    }
+  } catch(e) { /* ignore */ }
+}
+
+async function refresh() {
+  var sd = await readData();
+  if (sd && Object.keys(sd).length > 0) render(sd);
+}
+
+// boot
+if (typeof $ === 'function') {
+  $(function() { init(); });
+} else if (document.readyState === 'complete') {
+  init();
+} else {
+  window.addEventListener('load', init);
+}
+</script>
+</body>
+</html>
