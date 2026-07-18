@@ -32,7 +32,6 @@
   .quest-expiry { font-size:10px; color:var(--warn); white-space:nowrap; }
   .status-dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
   .status-dot.on { background:var(--safe); } .status-dot.off { background:var(--border); }
-  .debug { font-size:10px; color:var(--warn); padding:4px; background:var(--bar-bg); border-radius:4px; margin-top:4px; }
 </style>
 </head>
 <body>
@@ -48,7 +47,7 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 function pct(v) { return Math.min(250,Math.max(0,Number(v)||0)); }
 function hasVal(s) { var x=String(s||'').trim(); return x.length>0; }
 
-function render(sd, debug) {
+function render(sd) {
   var present = (sd.world && Array.isArray(sd.world.present_npc)) ? sd.world.present_npc : [];
   var world = sd.world || { season:'winter', weather:'阴' };
   var quest = sd.quest || { entries:{} };
@@ -80,45 +79,22 @@ function render(sd, debug) {
   else for (var k=0;k<aq.length;k++) {
     var a=aq[k]; h += '<div class="quest-card"><div class="quest-info"><div class="quest-name">'+esc(a.data.name||a.id)+'</div><div class="quest-desc">'+esc(a.data.description||'')+'</div></div><div class="quest-expiry">'+esc(a.data.expiry||'')+'</div></div>';
   }
-  if (debug) h += '<div class="debug">'+debug+'</div>';
   document.getElementById('panel').innerHTML = h;
 }
 
 async function tryRead() {
-  var debug = [];
-  // Method 1: getVariables (TH iframe API)
   if (typeof getVariables === 'function') {
     try {
       var v = getVariables({type:'message', message_id:'latest'});
-      debug.push('getVariables: ' + (v ? 'found' : 'null'));
       if (v && v.stat_data) { render(v.stat_data); return true; }
-    } catch(e) { debug.push('getVariables err: '+e.message); }
-  } else { debug.push('getVariables: not a function'); }
-  // Method 2: parent.getVariables
-  try {
-    if (parent && parent.getVariables) {
-      var pv = parent.getVariables({type:'message', message_id:'latest'});
-      if (pv && pv.stat_data) { render(pv.stat_data); return true; }
-    }
-  } catch(e) {}
-  // Method 3: parent.Mvu
-  try {
-    if (parent && parent.Mvu && parent.Mvu.getMvuData) {
-      var md = parent.Mvu.getMvuData({type:'message', message_id:'latest'});
-      if (md && md.stat_data) { render(md.stat_data); return true; }
-      if (md && md.data && md.data.stat_data) { render(md.data.stat_data); return true; }
-    }
-  } catch(e) {}
-  // Method 4: Mvu global
+    } catch(e) {}
+  }
   try {
     if (typeof Mvu !== 'undefined' && Mvu.getMvuData) {
-      var md2 = Mvu.getMvuData({type:'message', message_id:'latest'});
-      if (md2 && md2.stat_data) { render(md2.stat_data); return true; }
-      if (md2 && md2.data && md2.data.stat_data) { render(md2.data.stat_data); return true; }
+      var md = Mvu.getMvuData({type:'message', message_id:'latest'});
+      if (md && md.stat_data) { render(md.stat_data); return true; }
     }
   } catch(e) {}
-  render({}, debug.join('; '));
-  return false;
 }
 
 async function boot() {
