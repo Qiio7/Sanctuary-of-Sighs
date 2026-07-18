@@ -41,7 +41,12 @@ var NPC_LABELS = { eclipsa:'伊克利普斯', vespera:'维斯佩拉', valentina:
 var SEASON_LABELS = { spring:'春·透明之季', summer:'夏·灰色之季', autumn:'秋·金光之季', winter:'冬·雪狱之季' };
 var NPC_ORDER = ['eclipsa','vespera','valentina'];
 
-function affStage(v) { if(v<=0)return'陌生';if(v<50)return'初识';if(v<100)return'好感';if(v<150)return'亲密';if(v<200)return'爱恋';return'沉沦'; }
+var STAGE_NAMES = {
+  eclipsa: ['寒霜触手的疏离主人','紫色眼眸的偷看与借口','塔楼月下的失速心跳','失控的触手与母性泛滥','触手妈妈的温柔侍奉'],
+  vespera: ['蛛矛轻触·管家教程第一课','蜂蜜蛋糕与手把手的温柔陷阱','灶台边失控的心跳','蜘蛛小姐的防线崩塌','分羹者的告白'],
+  valentina: ['满身尖刺的笨拙女仆','摔碎茶杯的别扭关心','醋海翻波的傲娇大小姐','虎牙轻咬的投降','乖女儿的日常撒娇']
+};
+function affStage(key, v) { if(v<=0)return'陌生';var i=v<50?0:v<100?1:v<150?2:v<200?3:4;return STAGE_NAMES[key]?STAGE_NAMES[key][i]:'未知'; }
 function affCls(v) { if(v<50)return'low';if(v<100)return'mid';if(v<175)return'high';return'max'; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function pct(v) { return Math.min(250,Math.max(0,Number(v)||0)); }
@@ -60,7 +65,7 @@ function render(sd) {
     h += '<div class="npc-card '+(isPres?'present':'absent')+'">';
     h += '<div class="npc-head">';
     h += '<span class="npc-name">'+(isPres?'<span class="status-dot on"></span>':'<span class="status-dot off"></span>')+esc(NPC_LABELS[key])+'</span>';
-    h += '<span class="npc-stage">'+affStage(af)+'</span></div>';
+    h += '<span class="npc-stage">'+affStage(key,af)+'</span></div>';
     h += '<div class="aff-bar-row"><div class="aff-bar"><div class="aff-fill '+affCls(af)+'" style="width:'+(af/250*100)+'%"></div></div><span class="aff-num">'+af+'</span></div>';
     if (isPres) {
       h += '<div class="detail-row">';
