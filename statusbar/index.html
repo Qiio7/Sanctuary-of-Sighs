@@ -36,7 +36,6 @@
 </head>
 <body>
 <div class="panel" id="panel">加载中...</div>
-<div style="font-size:9px;color:var(--sub);text-align:center;">冬港暖风 panel v3</div>
 <script>
 var NPC_LABELS = { eclipsa:'伊克利普斯', vespera:'维斯佩拉', valentina:'瓦伦蒂娜' };
 var SEASON_LABELS = { spring:'春·透明之季', summer:'夏·灰色之季', autumn:'秋·金光之季', winter:'冬·雪狱之季' };
@@ -82,7 +81,7 @@ function render(sd) {
   else for (var k=0;k<aq.length;k++) {
     var a=aq[k]; h += '<div class="quest-card"><div class="quest-info"><div class="quest-name">'+esc(a.data.name||a.id)+'</div><div class="quest-desc">'+esc(a.data.description||'')+'</div></div><div class="quest-expiry">'+esc(a.data.expiry||'')+'</div></div>';
   }
-  h += '<div style="font-size:9px;color:var(--sub);text-align:center;margin-top:8px;">冬港暖风 panel v3</div>';
+  h += '<div style="font-size:9px;color:var(--sub);text-align:center;margin-top:8px;">冬港暖风 v2.1.0</div>';
   document.getElementById('panel').innerHTML = h;
 }
 
