@@ -99,14 +99,27 @@ async function tryRead() {
   } catch(e) {}
 }
 
+var loaded = false;
 async function boot() {
   for (var i=0;i<20;i++) {
     var ok = await tryRead();
-    if (ok) return;
+    if (ok) { loaded=true; return; }
     await new Promise(function(r){setTimeout(r,800);});
   }
   document.getElementById('panel').innerHTML = '<div style="color:var(--sub);text-align:center;padding:20px;">无数据 — 请继续对话</div>';
 }
+
+function refresh() { tryRead(); }
+
+try {
+  if (typeof eventOn === 'function') {
+    var t = null;
+    eventOn('MESSAGE_UPDATED', function() { if(t)clearTimeout(t); t=setTimeout(refresh,500); });
+    eventOn('MESSAGE_RECEIVED', function() { setTimeout(refresh,1500); });
+    eventOn('VARIABLE_UPDATE_ENDED', function() { setTimeout(refresh,300); });
+  }
+} catch(e) {}
+
 boot();
 </script>
 </body>
